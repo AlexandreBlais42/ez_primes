@@ -1,0 +1,12 @@
+.{
+    .name = .ez_primes,
+    .version = "0.0.0",
+    .fingerprint = 0x476725b3fe77fa25, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.16.0-dev.2535+b5bd49460",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
