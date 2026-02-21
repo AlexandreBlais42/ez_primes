@@ -11,6 +11,40 @@ test {
 const usize_size = @bitSizeOf(usize);
 const l1_cache_size = 128_000; // TODO: detect at runtime
 
+const very_small_primes = [4]usize{ 2, 3, 5, 7 };
+const very_small_primes_mask = blk: {
+    @setEvalBranchQuota(10000);
+    var prod: usize = 1;
+    for (very_small_primes) |p| prod *= p;
+
+    const max = prod + BitSet.mask_bit_size;
+    var buffer: [BitSet.numberOfMasksFromLength(max)]BitSet.MaskInt = undefined;
+    var bit_set = BitSet.init(max, &buffer);
+    bit_set.setAll();
+
+    for (very_small_primes) |p| {
+        var i: usize = 0;
+        while (i < max) : (i += p) {
+            bit_set.unset(i);
+        }
+    }
+
+    var masks: [prod]BitSet.MaskInt = undefined;
+    for (0..prod) |i| {
+        masks[i] = bit_set.getRelativeMask(i);
+    }
+
+    break :blk masks;
+};
+
+test very_small_primes_mask {
+    const expected_first = 0b0010100000100000100010100010000010100000100010100010100000000010;
+    try std.testing.expectEqual(expected_first, very_small_primes_mask[0]);
+
+    const expected_index_100 = 0b1000001000001010000010001010000010001000001000000010001010001010;
+    try std.testing.expectEqual(expected_index_100, very_small_primes_mask[100]);
+}
+
 pub const small_primes = blk: {
     const max = std.math.sqrt(l1_cache_size * 8);
     @setEvalBranchQuota(max * 10);
@@ -35,6 +69,17 @@ pub const small_primes = blk: {
     break :blk primes;
 };
 
+test small_primes {
+    var count: u8 = 0;
+    for (small_primes) |p| {
+        if (p < 100) count += 1;
+    }
+    try std.testing.expectEqual(25, count);
+
+    const biggest_small_prime = small_primes[small_primes.len - 1];
+    try std.testing.expect(primeCountUpperBound(biggest_small_prime) >= small_primes.len);
+}
+
 /// Returns an upper bound for the number of primes smaller than n.
 pub fn primeCountUpperBound(n: usize) usize {
     // https://en.wikipedia.org/wiki/Prime-counting_function#Inequalities Pierre Dusart
@@ -48,7 +93,8 @@ pub fn primeCountUpperBound(n: usize) usize {
         result /= log_n;
     }
 
-    result *= n / log_n;
+    result += 1;
+    result *= n_f / log_n;
 
     return @intFromFloat(@floor(result));
 }
@@ -81,19 +127,23 @@ threadlocal var sieveBuffer: [BitSet.numberOfMasksFromLength(l1_cache_size * 8)]
 pub fn sieveBlock(allocator: Allocator, known_primes: []const usize, offset: usize) Allocator.Error![]usize {
     var bit_set = BitSet.init(l1_cache_size * 8, &sieveBuffer);
 
-    // TODO: Apply the right mask
-    bit_set.setMasksTo(std.math.maxInt(BitSet.MaskInt));
+    // TODO: Evaluate if rearranging the masks to enable sequential access instead of having to do the modulo is worth it.
+    for (0..sieveBuffer.len) |i| {
+        bit_set.setMask(i, very_small_primes_mask[(i * BitSet.mask_bit_size + offset) % very_small_primes_mask.len]);
+    }
     if (offset <= 0) bit_set.unset(0);
     if (offset <= 1) bit_set.unset(1 - offset);
 
     for (known_primes) |p| {
-        // TODO: optimize this
-        var i = offset;
-        if (i % p != 0) {
-            i += p;
-            i -= i % p;
-        }
-        while (i < bit_set.bit_length + offset) : (i += p) {
+        var i = offset + p - 1;
+        i /= p;
+        i *= p;
+        // i is now the smallest multiple of p greather than or equal to offset
+
+        // TODO: Figure out our position on a wheel and start wheeling
+        // TODO: inline the loop in some way?
+        if (i % 2 != 1) i += p;
+        while (i < bit_set.bit_length + offset) : (i += 2 * p) {
             bit_set.unset(i - offset);
         }
     }

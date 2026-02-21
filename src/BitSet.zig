@@ -30,6 +30,14 @@ pub fn setMask(bit_set: BitSet, index: usize, data: MaskInt) void {
     bit_set.masks[index] = data;
 }
 
+pub fn setAll(bit_set: BitSet) void {
+    bit_set.setMasksTo(full_mask);
+}
+
+pub fn unsetAll(bit_set: BitSet) void {
+    bit_set.setMasksTo(0);
+}
+
 /// Returns a mask containing bits [index .. index+mask_bit_size - 1]
 pub fn getRelativeMask(bit_set: BitSet, index: usize) MaskInt {
     const mask_index = indexToMaskIndex(index);

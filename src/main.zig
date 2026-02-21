@@ -16,7 +16,7 @@ pub fn main(init: std.process.Init) !void {
     var futures_queue = try std.Deque(std.Io.Future(Allocator.Error![]usize)).initCapacity(gpa, 16);
     defer futures_queue.deinit(gpa);
 
-    try futures_queue.pushBack(gpa, io.async(ez_primes.sieveBlock, .{ arena, &ez_primes.small_primes, 0 }));
+    try futures_queue.pushBack(gpa, io.async(ez_primes.sieveBlock, .{ arena, ez_primes.small_primes[4..], 0 }));
     while (futures_queue.len > 0) {
         var fut = futures_queue.popFront().?;
         const primes = try fut.await(io);
