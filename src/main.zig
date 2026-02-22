@@ -49,5 +49,7 @@ pub fn main(init: std.process.Init) !void {
             try stdout.print("{d}\n", .{p});
         }
     }
-    try stdout.print("π({d}) = {d}\n", .{ count, primes.len });
+    try stdout.flush();
+
+    std.log.info("{d} primes computed", .{primes.len});
 }

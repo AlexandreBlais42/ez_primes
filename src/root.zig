@@ -45,7 +45,7 @@ test very_small_primes_mask {
     try std.testing.expectEqual(expected_index_100, very_small_primes_mask[100]);
 }
 
-pub const small_primes = blk: {
+const small_primes = blk: {
     const max = std.math.sqrt(l1_cache_size * 8);
     @setEvalBranchQuota(max * 15);
 
@@ -99,9 +99,10 @@ pub fn primeCountUpperBound(n: usize) usize {
     return @intFromFloat(@floor(result));
 }
 
-pub fn sieveNaive(bitset: *BitSet) void {
+fn sieveNaive(bitset: *BitSet) void {
     const num_words = bitset.numberOfMasks();
 
+    // TODO: Use the computed mask
     const mask = blk: {
         var result: usize = 0b10;
         while (true) {
@@ -123,6 +124,7 @@ pub fn sieveNaive(bitset: *BitSet) void {
     }
 }
 
+/// returns primes p such that from <= p <= to
 pub fn computePrimes(io: Io, gpa: Allocator, from: usize, to: usize) ![]usize {
     var futures_queue = try std.Deque(std.Io.Future(Allocator.Error![]usize)).initCapacity(gpa, 16);
     defer futures_queue.deinit(gpa);
@@ -143,18 +145,17 @@ pub fn computePrimes(io: Io, gpa: Allocator, from: usize, to: usize) ![]usize {
         const new_primes = try fut.await(io);
         defer gpa.free(new_primes);
 
-        // Holy page faults and cache misses
+        // FIX: Page faults and cache misses
         for (new_primes) |prime| {
             primes.appendAssumeCapacity(prime);
         }
         const new_biggest_prime = primes.getLast();
         defer biggest_prime = new_biggest_prime;
 
-        const a = biggest_prime * biggest_prime / sieve_size;
-        const b = @min(new_biggest_prime * new_biggest_prime, to) / sieve_size;
+        const lower = biggest_prime * biggest_prime / sieve_size;
+        const upper = @min(new_biggest_prime * new_biggest_prime, to) / sieve_size;
 
-        var i: usize = a + 1;
-        while (i <= b) : (i += 1) {
+        for (lower + 1..upper + 1) |i| {
             try futures_queue.pushBack(gpa, io.async(sieveBlock, .{ gpa, primes.items[very_small_primes.len..], i * sieve_size }));
         }
     }
@@ -170,9 +171,32 @@ pub fn computePrimes(io: Io, gpa: Allocator, from: usize, to: usize) ![]usize {
     return gpa.dupe(usize, primes.items[bottom_index..upper_index]);
 }
 
+test computePrimes {
+    const io = std.testing.io;
+    const allocator = std.testing.allocator;
+
+    // https://en.wikipedia.org/wiki/Prime-counting_function#Table_of_%CF%80(x),_%E2%81%A0x/log_x_%E2%81%A0,_and_li(x)
+    const known_pi_values = [_]struct { usize, usize }{
+        .{ std.math.pow(usize, 10, 1), 4 },
+        .{ std.math.pow(usize, 10, 2), 25 },
+        .{ std.math.pow(usize, 10, 3), 168 },
+        .{ std.math.pow(usize, 10, 4), 1229 },
+        .{ std.math.pow(usize, 10, 5), 9592 },
+        .{ std.math.pow(usize, 10, 6), 78498 },
+    };
+
+    for (known_pi_values) |values| {
+        const n, const amount = values;
+        const primes = try computePrimes(io, allocator, 0, n);
+        defer allocator.free(primes);
+
+        try std.testing.expectEqual(amount, primes.len);
+    }
+}
+
 const sieve_size = l1_cache_size * 8;
 threadlocal var sieve_buffer: [BitSet.numberOfMasksFromLength(sieve_size)]BitSet.MaskInt align(64) = undefined;
-pub fn sieveBlock(gpa: Allocator, known_primes: []const usize, offset: usize) Allocator.Error![]usize {
+fn sieveBlock(gpa: Allocator, known_primes: []const usize, offset: usize) Allocator.Error![]usize {
     var bit_set = BitSet.init(l1_cache_size * 8, &sieve_buffer);
 
     // TODO: Evaluate if rearranging the masks to enable sequential access instead of having to do the modulo is worth it.
