@@ -4,6 +4,9 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const clap_dep = b.dependency("clap", .{});
+    const clap_mod = clap_dep.module("clap");
+
     const mod = b.addModule("ez_primes", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -17,6 +20,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "ez_primes", .module = mod },
+                .{ .name = "clap", .module = clap_mod },
             },
         }),
     });

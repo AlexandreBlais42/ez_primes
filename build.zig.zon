@@ -1,9 +1,14 @@
 .{
     .name = .ez_primes,
-    .version = "0.0.0",
+    .version = "0.1.0",
     .fingerprint = 0x476725b3fe77fa25, // Changing this has security and trust implications.
     .minimum_zig_version = "0.16.0-dev.2535+b5bd49460",
-    .dependencies = .{},
+    .dependencies = .{
+        .clap = .{
+            .url = "git+https://github.com/Hejsil/zig-clap#27621cb7207643f914bae7b01902b22a8b5916e7",
+            .hash = "clap-0.11.0-oBajBxDoAQChQCl4LRM4tyf-VChKLbhYilS806xxzxrQ",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",
