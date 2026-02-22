@@ -221,7 +221,7 @@ fn sieveBlock(gpa: Allocator, known_primes: []const usize, offset: usize) Alloca
         var i = offset + p - 1;
         i /= p;
         i *= p;
-        // i is now the smallest multiple of p greather than or equal to offset
+        // i is now the smallest multiple of p greater than or equal to offset
 
         // TODO: Figure out our position on a wheel and start wheeling
         // TODO: inline the loop in some way?
