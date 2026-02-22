@@ -155,7 +155,8 @@ pub fn computePrimes(io: Io, gpa: Allocator, from: usize, to: usize) ![]usize {
         const lower = biggest_prime * biggest_prime / sieve_size;
         const upper = @min(new_biggest_prime * new_biggest_prime, to) / sieve_size;
 
-        for (lower + 1..upper + 1) |i| {
+        var i = lower + 1;
+        while (i <= upper) : (i += 1) {
             try futures_queue.pushBack(gpa, io.async(sieveBlock, .{ gpa, primes.items[very_small_primes.len..], i * sieve_size }));
         }
     }
