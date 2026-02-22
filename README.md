@@ -11,13 +11,13 @@ ez_primes n
 
 Here are the results on my laptop:
 
-|  n   | ez_primes | primesieve | delta  |
-|------|-----------|------------|--------|
-|$10^6$|   3.03ms  | 3.06ms     | -1.1%  |
-|$10^6$|   16.3ms  | 11.7ms     | +38.8% |
-|$10^8$|   120ms   | 89.3ms     | +34.5% |
-|$10^9$|   1200ms  | 872ms      | +37.0% |
-|$10^9$|   12.5s   | 8.83s      | +41.8% |
+|  n    | ez_primes | primesieve | delta  |
+|-------|-----------|------------|--------|
+|$10^6$ |   3.03ms  | 3.06ms     | -1.1%  |
+|$10^7$ |   16.3ms  | 11.7ms     | +38.8% |
+|$10^8$ |   120ms   | 89.3ms     | +34.5% |
+|$10^9$ |   1200ms  | 872ms      | +37.0% |
+|$10^10$|   12.5s   | 8.83s      | +41.8% |
 
 `ez_primes` is 40% slower than `primesieve`. There are still many optimizations available that will help close this gap.
 In particular, `ez_primes` does 2700% more cache misses and 260% more branch misses than primesieve.
