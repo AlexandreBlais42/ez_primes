@@ -9,22 +9,34 @@ pub fn main(init: std.process.Init) !void {
     });
     const io = threaded_io.io();
 
-    // std.debug.print("Small primes: {any}\n", .{ez_primes.small_primes});
-    const arena = init.arena.allocator();
+    _ = init.arena.allocator();
     const gpa = init.gpa;
 
-    var futures_queue = try std.Deque(std.Io.Future(Allocator.Error![]usize)).initCapacity(gpa, 16);
-    defer futures_queue.deinit(gpa);
+    const args = try init.minimal.args.toSlice(gpa);
+    defer gpa.free(args);
 
-    try futures_queue.pushBack(gpa, io.async(ez_primes.sieveBlock, .{ arena, ez_primes.small_primes[4..], 0 }));
-    while (futures_queue.len > 0) {
-        var fut = futures_queue.popFront().?;
-        const primes = try fut.await(io);
-
-        var count: u64 = ez_primes.small_primes.len;
-        for (primes) |p| {
-            if (p < 1000000) count += 1;
-        }
-        std.debug.print("count: {d}\n", .{count});
+    if (args.len != 2) {
+        std.log.err("Format: {s} count", .{args[0]});
+        return;
     }
+
+    const count = std.fmt.parseInt(usize, args[1], 10) catch {
+        std.log.err("Argument \"{s}\" is not a number", .{args[1]});
+        return;
+    };
+
+    const primes = try ez_primes.computePrimes(io, gpa, 0, count);
+    defer gpa.free(primes);
+
+    var stdout_file = std.Io.File.stdout();
+    const stdout_buffer = try gpa.alloc(u8, 1_000_000);
+    defer gpa.free(stdout_buffer);
+    var stdout_writer = stdout_file.writer(io, stdout_buffer);
+    const stdout = &stdout_writer.interface;
+    defer stdout.flush() catch unreachable;
+
+    for (primes) |p| {
+        try stdout.print("{d}\n", .{p});
+    }
+    try stdout.print("pi({d}) = {d}\n", .{ count, primes.len });
 }

@@ -199,13 +199,16 @@ const Iterator = struct {
 
     pub fn next(it: *Iterator) ?usize {
         while (it.current_mask == 0) {
+            @branchHint(.likely);
             it.current_index += 1;
             if (it.current_index >= it.bit_set.numberOfMasks()) {
+                @branchHint(.unlikely);
                 break;
             }
             it.current_mask = it.bit_set.masks[it.current_index];
         }
         if (it.current_mask != 0) {
+            @branchHint(.likely);
             const index = @ctz(it.current_mask);
             it.current_mask ^= indexToBitMask(index);
             return it.current_index * mask_bit_size + index;

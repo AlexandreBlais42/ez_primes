@@ -47,7 +47,7 @@ test very_small_primes_mask {
 
 pub const small_primes = blk: {
     const max = std.math.sqrt(l1_cache_size * 8);
-    @setEvalBranchQuota(max * 10);
+    @setEvalBranchQuota(max * 15);
 
     var bit_set_buffer: [BitSet.numberOfMasksFromLength(max)]BitSet.MaskInt = undefined;
     var bit_set = BitSet{
@@ -123,12 +123,60 @@ pub fn sieveNaive(bitset: *BitSet) void {
     }
 }
 
-threadlocal var sieveBuffer: [BitSet.numberOfMasksFromLength(l1_cache_size * 8)]BitSet.MaskInt align(64) = undefined;
-pub fn sieveBlock(allocator: Allocator, known_primes: []const usize, offset: usize) Allocator.Error![]usize {
-    var bit_set = BitSet.init(l1_cache_size * 8, &sieveBuffer);
+pub fn computePrimes(io: Io, gpa: Allocator, from: usize, to: usize) ![]usize {
+    var futures_queue = try std.Deque(std.Io.Future(Allocator.Error![]usize)).initCapacity(gpa, 16);
+    defer futures_queue.deinit(gpa);
+
+    const maximum_number_of_primes = primeCountUpperBound(to);
+    const primes_buffer = try gpa.alloc(usize, maximum_number_of_primes + sieve_size);
+    defer gpa.free(primes_buffer);
+    var primes = std.ArrayList(usize).initBuffer(primes_buffer);
+
+    for (small_primes) |prime| {
+        primes.appendAssumeCapacity(prime);
+    }
+
+    var biggest_prime: usize = primes.getLast();
+    try futures_queue.pushBack(gpa, io.async(sieveBlock, .{ gpa, primes.items[very_small_primes.len..], 0 }));
+    while (futures_queue.len > 0) {
+        var fut = futures_queue.popFront().?;
+        const new_primes = try fut.await(io);
+        defer gpa.free(new_primes);
+
+        // Holy page faults and cache misses
+        for (new_primes) |prime| {
+            primes.appendAssumeCapacity(prime);
+        }
+        const new_biggest_prime = primes.getLast();
+        defer biggest_prime = new_biggest_prime;
+
+        const a = biggest_prime * biggest_prime / sieve_size;
+        const b = @min(new_biggest_prime * new_biggest_prime, to) / sieve_size;
+
+        var i: usize = a + 1;
+        while (i <= b) : (i += 1) {
+            try futures_queue.pushBack(gpa, io.async(sieveBlock, .{ gpa, primes.items[very_small_primes.len..], i * sieve_size }));
+        }
+    }
+
+    const compare = (struct {
+        pub fn compare(a: usize, b: usize) std.math.Order {
+            return std.math.order(a, b);
+        }
+    }).compare;
+    const bottom_index = std.sort.lowerBound(usize, primes.items, from, compare);
+    const upper_index = std.sort.upperBound(usize, primes.items, to, compare);
+
+    return gpa.dupe(usize, primes.items[bottom_index..upper_index]);
+}
+
+const sieve_size = l1_cache_size * 8;
+threadlocal var sieve_buffer: [BitSet.numberOfMasksFromLength(sieve_size)]BitSet.MaskInt align(64) = undefined;
+pub fn sieveBlock(gpa: Allocator, known_primes: []const usize, offset: usize) Allocator.Error![]usize {
+    var bit_set = BitSet.init(l1_cache_size * 8, &sieve_buffer);
 
     // TODO: Evaluate if rearranging the masks to enable sequential access instead of having to do the modulo is worth it.
-    for (0..sieveBuffer.len) |i| {
+    for (0..sieve_buffer.len) |i| {
         bit_set.setMask(i, very_small_primes_mask[(i * BitSet.mask_bit_size + offset) % very_small_primes_mask.len]);
     }
     if (offset <= 0) bit_set.unset(0);
@@ -148,11 +196,12 @@ pub fn sieveBlock(allocator: Allocator, known_primes: []const usize, offset: usi
         }
     }
 
-    const primes = try allocator.alloc(usize, bit_set.count());
+    const primes = try gpa.alloc(usize, bit_set.count());
+    errdefer unreachable;
     var it = bit_set.iterator();
     var primes_index: usize = 0;
     while (it.next()) |prime| {
-        primes[primes_index] = prime;
+        primes[primes_index] = prime + offset;
         primes_index += 1;
     }
 
