@@ -13,14 +13,14 @@ Here are the results on my laptop:
 
 |  n      | ez_primes | primesieve | delta  |
 |---------|-----------|------------|--------|
-|$10^6$   |   3.03ms  | 3.06ms     | -1.1%  |
-|$10^7$   |   16.3ms  | 11.7ms     | +38.8% |
-|$10^8$   |   120ms   | 89.3ms     | +34.5% |
-|$10^9$   |   1200ms  | 872ms      | +37.0% |
-|$10^{10}$|   12.5s   | 8.83s      | +41.8% |
+|$10^6$   |   3.00ms  | 3.05ms     | -1.6%  |
+|$10^7$   |   14.8ms  | 11.6ms     | +26.9% |
+|$10^8$   |   105ms   | 89.6ms     | +16.7% |
+|$10^9$   |   1030ms  | 873ms      | +17.7% |
+|$10^{10}$|   10.9s   | 8.78s      | +23.9% |
 
-`ez_primes` is 40% slower than `primesieve`. There are still many optimizations available that will help close this gap.
-In particular, `ez_primes` does 2700% more cache misses and 260% more branch misses than primesieve.
+`ez_primes` is 25% slower than `primesieve`. There are still many optimizations available that will help close this gap.
+In particular, `ez_primes` does 6100% more cache misses and 110% more branch misses than primesieve.
 I also noticed that `primesieve` uses a constant amount of memory while `ez_primes` does not. For example, at $n = 10^{10}$, `primesieve` uses 5.74MB and `ez_primes` uses 7.29**GB**. This results in a huge amount of cache misses and page faults, significantly slowing down the program.
 
 ## How does it work?

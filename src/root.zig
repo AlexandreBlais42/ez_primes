@@ -99,6 +99,12 @@ pub fn primeCountUpperBound(n: usize) usize {
     return @intFromFloat(@floor(result));
 }
 
+const compare = (struct {
+    pub fn compare(a: usize, b: usize) std.math.Order {
+        return std.math.order(a, b);
+    }
+}).compare;
+
 fn sieveNaive(bitset: *BitSet) void {
     const num_words = bitset.numberOfMasks();
 
@@ -161,11 +167,6 @@ pub fn computePrimes(io: Io, gpa: Allocator, from: usize, to: usize) ![]usize {
         }
     }
 
-    const compare = (struct {
-        pub fn compare(a: usize, b: usize) std.math.Order {
-            return std.math.order(a, b);
-        }
-    }).compare;
     const bottom_index = std.sort.lowerBound(usize, primes.items, from, compare);
     const upper_index = std.sort.upperBound(usize, primes.items, to, compare);
 
@@ -204,10 +205,19 @@ fn sieveBlock(gpa: Allocator, known_primes: []const usize, offset: usize) Alloca
     for (0..sieve_buffer.len) |i| {
         bit_set.setMask(i, very_small_primes_mask[(i * BitSet.mask_bit_size + offset) % very_small_primes_mask.len]);
     }
-    if (offset <= 0) bit_set.unset(0);
-    if (offset <= 1) bit_set.unset(1 - offset);
+    if (offset <= 1) {
+        @branchHint(.unlikely);
+        bit_set.unset(1 - offset);
+        if (offset == 0) {
+            @branchHint(.unlikely);
+            bit_set.unset(0);
+        }
+    }
 
-    for (known_primes) |p| {
+    const max_prime: usize = std.math.sqrt(bit_set.bit_length + offset) + 1;
+    const upper_bound = std.sort.upperBound(usize, known_primes, max_prime, compare);
+
+    for (known_primes[0..upper_bound]) |p| {
         var i = offset + p - 1;
         i /= p;
         i *= p;
