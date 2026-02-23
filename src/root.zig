@@ -9,7 +9,7 @@ test {
 }
 
 const usize_size = @bitSizeOf(usize);
-const l1_cache_size = 128_000; // TODO: detect at runtime
+const l1_cache_size = 130_000; // TODO: detect at runtime
 
 const very_small_primes = [4]usize{ 2, 3, 5, 7 };
 const very_small_primes_mask = blk: {
