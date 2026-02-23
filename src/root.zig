@@ -133,7 +133,13 @@ fn sieveNaive(bitset: *BitSet) void {
 /// returns primes p such that from <= p <= to
 pub fn computePrimes(io: Io, gpa: Allocator, from: usize, to: usize) ![]usize {
     var futures_queue = try std.Deque(std.Io.Future(Allocator.Error![]usize)).initCapacity(gpa, 16);
-    defer futures_queue.deinit(gpa);
+    defer {
+        while (futures_queue.len > 0) {
+            var fut = futures_queue.popFront().?;
+            _ = fut.cancel(io) catch {};
+        }
+        futures_queue.deinit(gpa);
+    }
 
     const maximum_number_of_primes = primeCountUpperBound(to);
     const primes_buffer = try gpa.alloc(usize, maximum_number_of_primes + sieve_size);
